@@ -41,6 +41,59 @@ last_post_text = {}
 user_state = {}
 user_message_count = {}
 
+
+def subscription_guard(func):
+    def wrapper(message_or_call, *args, **kwargs):
+        user_id = (
+            message_or_call.from_user.id
+            if hasattr(message_or_call, "from_user")
+            else message_or_call.message.chat.id
+        )
+        # Для владельца всегда разрешено, без предложения подписки
+        if user_id == OWNER_ID:
+            return func(message_or_call, *args, **kwargs)
+        if not check_subscription(user_id):
+            chat_id = (
+                message_or_call.message.chat.id
+                if hasattr(message_or_call, "message")
+                else message_or_call.chat.id
+            )
+            bot.send_message(
+                chat_id,
+                "❗ Чтобы пользоваться ботом, подпишитесь на канал @staritsin_school",
+                reply_markup=build_subscribe_keyboard()
+            )
+            return
+        return func(message_or_call, *args, **kwargs)
+    return wrapper
+
+# Добавьте в главное меню кнопку "Статистика" только для владельца
+@bot.message_handler(commands=['menu'])
+@subscription_guard
+def show_menu(message):
+    chat_id = message.chat.id
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("🚀 Ещё больше автоматизации тут", url=ROCKET_URL))
+    # Кнопка "Статистика" только для владельца
+    if chat_id == OWNER_ID:
+        markup.add(InlineKeyboardButton("Статистика", callback_data="admin_stats"))
+    bot.send_message(chat_id, "Главное меню:", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "admin_stats")
+def show_admin_stats(call):
+    if call.message.chat.id != OWNER_ID:
+        bot.answer_callback_query(call.id, "Нет доступа")
+        return
+    # Пример статистики, добавьте свои параметры
+    stats = (
+        f"👤 Пользователей: {len(user_state)}\n"
+        f"📥 Ссылок в очереди: {len(user_links)}\n"
+        f"📝 Постов: {len(user_posts)}\n"
+        f"🗂️ Всего сообщений: {sum(user_message_count.values()) if 'user_message_count' in globals() else 'N/A'}"
+    )
+    bot.send_message(call.message.chat.id, f"Статистика бота:\n{stats}")
+    bot.answer_callback_query(call.id)
+
 def check_subscription(user_id):
     if user_id == OWNER_ID:
         return True
