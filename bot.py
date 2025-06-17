@@ -42,6 +42,7 @@ user_state = {}
 user_message_count = {}
 
 
+
 def subscription_guard(func):
     def wrapper(message_or_call, *args, **kwargs):
         user_id = (
@@ -106,7 +107,12 @@ def check_subscription(user_id):
 
 def build_subscribe_keyboard():
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("Перейти в канал", url=CHANNEL_URL))
+    markup.add(
+        InlineKeyboardButton("Перейти в канал", url="https://t.me/staritsin_school")
+    )
+    markup.add(
+        InlineKeyboardButton("Проверить подписку", callback_data="check_subscription")
+    )
     return markup
 
 def subscription_guard(func):
@@ -252,17 +258,21 @@ def send_welcome(message):
     )
     bot.send_message(chat_id, welcome_text)
 
-@bot.callback_query_handler(func=lambda call: call.data == 'check_subscription')
-@subscription_guard
-def handle_check_subscription(call: CallbackQuery):
+@bot.callback_query_handler(func=lambda call: call.data == "check_subscription")
+def handle_check_subscription(call):
+    user_id = call.from_user.id
     chat_id = call.message.chat.id
-    bot.answer_callback_query(call.id, "✅ Подписка подтверждена! Можете пользоваться ботом.")
-    bot.send_message(
-        chat_id,
-        "Спасибо за подписку! Теперь отправьте ссылку на видео или пост."
-    )
-    user_state[chat_id] = 'WAITING_FOR_LINK'
-
+    if user_id == OWNER_ID or check_subscription(user_id):
+        bot.answer_callback_query(call.id, "✅ Подписка подтверждена! Можете пользоваться ботом.")
+        bot.send_message(chat_id, "Спасибо за подписку! Теперь отправьте ссылку на видео или пост.")
+        user_state[chat_id] = 'WAITING_FOR_LINK'
+    else:
+        bot.answer_callback_query(call.id, "❌ Подписка не найдена.")
+        bot.send_message(
+            chat_id,
+            "❗ Я не вижу вашу подписку. Проверьте, что вы подписаны на канал @staritsin_school и попробуйте снова.",
+            reply_markup=build_subscribe_keyboard()
+        )
 @bot.message_handler(commands=['donate'])
 @subscription_guard
 def handle_donate(message):
