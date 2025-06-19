@@ -1,4 +1,6 @@
 pyTelegramBotAPI
 yt-dlp
 openai
+python-dotenv
+
 
